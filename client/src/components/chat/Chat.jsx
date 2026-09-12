@@ -5,14 +5,14 @@ import apiRequest from "../../lib/apiRequest";
 import { format } from "timeago.js";
 import { SocketContext } from "../../context/SocketContext";
 import { useNotificationStore } from "../../lib/notificationStore";
+import UploadWidget from "../uploadWidget/UploadWidget";
 
 function Chat({ chats }) {
+  const [uploading, setUploading] = useState(false);
   const [chat, setChat] = useState(null);
   const { currentUser } = useContext(AuthContext);
   const { socket } = useContext(SocketContext);
-
   const messageEndRef = useRef();
-
   const decrease = useNotificationStore((state) => state.decrease);
 
   useEffect(() => {
@@ -33,10 +33,8 @@ function Chat({ chats }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const formData = new FormData(e.target);
     const text = formData.get("text");
-
     if (!text) return;
     try {
       const res = await apiRequest.post("/messages/" + chat.id, { text });
@@ -48,6 +46,29 @@ function Chat({ chats }) {
       });
     } catch (err) {
       console.log(err);
+    }
+  };
+
+  // console.log("Sending image URL to backend:", url);
+  const handleSendImage = async (url) => {
+    if (!url || !chat?.id) return;
+
+    try {
+      const res = await apiRequest.post(`/messages/${chat.id}`, {
+        imageUrl: url,
+      });
+
+      setChat((prev) => ({
+        ...prev,
+        messages: [...prev.messages, res.data],
+      }));
+
+      socket.emit("sendMessage", {
+        receiverId: chat.receiver.id,
+        data: res.data,
+      });
+    } catch (err) {
+      console.error("Error sending image:", err);
     }
   };
 
@@ -63,11 +84,15 @@ function Chat({ chats }) {
     if (chat && socket) {
       socket.on("getMessage", (data) => {
         if (chat.id === data.chatId) {
-          setChat((prev) => ({ ...prev, messages: [...prev.messages, data] }));
+          setChat((prev) => ({
+            ...prev,
+            messages: [...prev.messages, data],
+          }));
           read();
         }
       });
     }
+
     return () => {
       socket.off("getMessage");
     };
@@ -95,6 +120,7 @@ function Chat({ chats }) {
           </div>
         ))}
       </div>
+
       {chat && (
         <div className="chatBox">
           <div className="top">
@@ -106,29 +132,39 @@ function Chat({ chats }) {
               X
             </span>
           </div>
+
           <div className="center">
             {chat.messages.map((message) => (
               <div
-                className="chatMessage"
-                style={{
-                  alignSelf:
-                    message.userId === currentUser.id
-                      ? "flex-end"
-                      : "flex-start",
-                  textAlign:
-                    message.userId === currentUser.id ? "right" : "left",
-                }}
+                className={`chatMessage ${
+                  message.userId === currentUser.id ? "own" : ""
+                }`}
                 key={message.id}
               >
-                <p>{message.text}</p>
+                {message.imageUrl && (
+                  <img
+                    src={message.imageUrl}
+                    alt="chat-img"
+                    className="chatImage"
+                  />
+                )}
+                {message.text && <p>{message.text}</p>}
                 <span>{format(message.createdAt)}</span>
               </div>
             ))}
             <div ref={messageEndRef}></div>
           </div>
+
           <form onSubmit={handleSubmit} className="bottom">
-            <textarea name="text"></textarea>
-            <button>Send</button>
+            <textarea name="text" placeholder="Type a message..." />
+            <button disabled={uploading}>Send</button>
+            <UploadWidget
+              uwConfig={{
+                cloudName: "dtqrjhuc8",
+                uploadPreset: "estate",
+              }}
+              setState={(images) => handleSendImage(images[images.length - 1])}
+            />
           </form>
         </div>
       )}
@@ -137,3 +173,227 @@ function Chat({ chats }) {
 }
 
 export default Chat;
+
+// import { useContext, useEffect, useRef, useState } from "react";
+// import "./chat.scss";
+// import { AuthContext } from "../../context/AuthContext";
+// import apiRequest from "../../lib/apiRequest";
+// import { format } from "timeago.js";
+// import { SocketContext } from "../../context/SocketContext";
+// import { useNotificationStore } from "../../lib/notificationStore";
+// //new
+// import UploadWidget from "../uploadWidget/UploadWidget";
+
+// function Chat({ chats }) {
+//   const [uploading, setUploading] = useState(false);
+//   const [chat, setChat] = useState(null);
+//   const { currentUser } = useContext(AuthContext);
+//   const { socket } = useContext(SocketContext);
+
+//   const messageEndRef = useRef();
+
+//   const decrease = useNotificationStore((state) => state.decrease);
+
+//   useEffect(() => {
+//     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+//   }, [chat]);
+
+//   const handleOpenChat = async (id, receiver) => {
+//     try {
+//       const res = await apiRequest("/chats/" + id);
+//       if (!res.data.seenBy.includes(currentUser.id)) {
+//         decrease();
+//       }
+//       setChat({ ...res.data, receiver });
+//     } catch (err) {
+//       console.log(err);
+//     }
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     const formData = new FormData(e.target);
+//     const text = formData.get("text");
+//     if (!text) return;
+//     try {
+//       const res = await apiRequest.post("/messages/" + chat.id, { text });
+//       setChat((prev) => ({ ...prev, messages: [...prev.messages, res.data] }));
+//       e.target.reset();
+//       socket.emit("sendMessage", {
+//         receiverId: chat.receiver.id,
+//         data: res.data,
+//       });
+//     } catch (err) {
+//       console.log(err);
+//     }
+//   };
+
+//   // const handleSubmit = async (e) => {
+//   //   e.preventDefault();
+
+//   //   const formData = new FormData(e.target);
+//   //   const text = formData.get("text");
+
+//   //   if (!text) return;
+//   //   try {
+//   //     const res = await apiRequest.post("/messages/" + chat.id, { text });
+//   //     setChat((prev) => ({ ...prev, messages: [...prev.messages, res.data] }));
+//   //     e.target.reset();
+//   //     socket.emit("sendMessage", {
+//   //       receiverId: chat.receiver.id,
+//   //       data: res.data,
+//   //     });
+//   //   } catch (err) {
+//   //     console.log(err);
+//   //   }
+//   // };
+
+//   //new added
+//   const handleSendImage = async (url) => {
+//     if (!url || !chat?.id) return;
+
+//     try {
+//       const res = await apiRequest.post(`/messages/${chat.id}`, {
+//         imageUrl: url,
+//       });
+
+//       // Append new message to chat state
+//       setChat((prev) => ({
+//         ...prev,
+//         messages: [...prev.messages, res.data],
+//       }));
+
+//       // Emit via socket to receiver
+//       socket.emit("sendMessage", {
+//         receiverId: chat.receiver.id,
+//         data: res.data,
+//       });
+//     } catch (err) {
+//       console.error("Error sending image:", err);
+//     }
+//   };
+
+//   useEffect(() => {
+//     const read = async () => {
+//       try {
+//         await apiRequest.put("/chats/read/" + chat.id);
+//       } catch (err) {
+//         console.log(err);
+//       }
+//     };
+
+//     if (chat && socket) {
+//       socket.on("getMessage", (data) => {
+//         if (chat.id === data.chatId) {
+//           setChat((prev) => ({ ...prev, messages: [...prev.messages, data] }));
+//           read();
+//         }
+//       });
+//     }
+//     return () => {
+//       socket.off("getMessage");
+//     };
+//   }, [socket, chat]);
+
+//   return (
+//     <div className="chat">
+//       <div className="messages">
+//         <h1>Messages</h1>
+//         {chats?.map((c) => (
+//           <div
+//             className="message"
+//             key={c.id}
+//             style={{
+//               backgroundColor:
+//                 c.seenBy.includes(currentUser.id) || chat?.id === c.id
+//                   ? "white"
+//                   : "#fecd514e",
+//             }}
+//             onClick={() => handleOpenChat(c.id, c.receiver)}
+//           >
+//             <img src={c.receiver.avatar || "/noavatar.jpg"} alt="" />
+//             <span>{c.receiver.username}</span>
+//             <p>{c.lastMessage}</p>
+//           </div>
+//         ))}
+//       </div>
+//       {chat && (
+//         <div className="chatBox">
+//           <div className="top">
+//             <div className="user">
+//               <img src={chat.receiver.avatar || "noavatar.jpg"} alt="" />
+//               {chat.receiver.username}
+//             </div>
+//             <span className="close" onClick={() => setChat(null)}>
+//               X
+//             </span>
+//           </div>
+//           <div className="center">
+//             {chat.messages.map((message) => (
+//               // <div
+//               //   className="chatMessage"
+//               //   style={{
+//               //     alignSelf:
+//               //       message.userId === currentUser.id
+//               //         ? "flex-end"
+//               //         : "flex-start",
+//               //     textAlign:
+//               //       message.userId === currentUser.id ? "right" : "left",
+//               //   }}
+//               //   key={message.id}
+//               // >
+//               //   <p>{message.text}</p>
+//               //   <span>{format(message.createdAt)}</span>
+//               // </div>
+
+//               <div
+//                 className="chatMessage"
+//                 style={{
+//                   alignSelf:
+//                     message.userId === currentUser.id
+//                       ? "flex-end"
+//                       : "flex-start",
+//                   textAlign:
+//                     message.userId === currentUser.id ? "right" : "left",
+//                 }}
+//                 key={message.id}
+//               >
+//                 {/* Show image if exists */}
+//                 {message.imageUrl && (
+//                   <img
+//                     src={message.imageUrl}
+//                     alt="chat-img"
+//                     className="chatImage"
+//                   />
+//                 )}
+
+//                 {/* Show text if exists */}
+//                 {message.text && <p>{message.text}</p>}
+
+//                 <span>{format(message.createdAt)}</span>
+//               </div>
+//             ))}
+//             <div ref={messageEndRef}></div>
+//           </div>
+//           {/* <form onSubmit={handleSubmit} className="bottom">
+//             <textarea name="text"></textarea>
+//             <button>Send</button>
+//           </form> */}
+//           <form onSubmit={handleSubmit} className="bottom">
+//             <textarea name="text" placeholder="Type a message..." />
+//             <button disabled={uploading}>Send</button>
+//             <UploadWidget
+//               uwConfig={{
+//                 cloudName: "dtqrjhuc8",
+//                 uploadPreset: "estate",
+//               }}
+//               setState={(images) => handleSendImage(images[images.length - 1])}
+//             />
+//           </form>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default Chat;

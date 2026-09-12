@@ -13,7 +13,6 @@ export const register = async (req, res) => {
 
     console.log(hashedPassword);
 
-    // CREATE A NEW USER AND SAVE TO DB
     const newUser = await prisma.user.create({
       data: {
         username,
@@ -35,7 +34,6 @@ export const login = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // CHECK IF THE USER EXISTS
 
     const user = await prisma.user.findUnique({
       where: { username },
