@@ -28,7 +28,13 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-function Map({ items, selectedItem, onItemSelect }) {
+function Map({
+  items,
+  selectedItem,
+  onItemSelect,
+  onDistanceChange,
+  mapMode = "list",
+}) {
   const [userLocation, setUserLocation] = useState(null);
 
   // Get user's current location
@@ -46,7 +52,11 @@ function Map({ items, selectedItem, onItemSelect }) {
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
 
-        console.log("Current location:", latitude, longitude);
+        console.log(
+          "Current location:",
+          latitude,
+          longitude
+        );
 
         setUserLocation([latitude, longitude]);
       },
@@ -60,25 +70,34 @@ function Map({ items, selectedItem, onItemSelect }) {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
-      },
+      }
     );
   }, []);
 
   // Calculate distance from user to each property
   useEffect(() => {
-    if (userLocation) {
+    if (userLocation && items.length > 0) {
       items.forEach((item) => {
+        const latitude = Number(item.latitude);
+        const longitude = Number(item.longitude);
+
         const distance = getDistanceFromLatLonInKm(
           userLocation[0],
           userLocation[1],
-          Number(item.latitude),
-          Number(item.longitude),
+          latitude,
+          longitude
         );
 
-        console.log(`Distance to ${item.title}: ${distance.toFixed(2)} km`);
+        console.log(
+          `Distance to ${item.title}: ${distance.toFixed(2)} km`
+        );
+
+        if (onDistanceChange) {
+          onDistanceChange(distance);
+        }
       });
     }
-  }, [userLocation, items]);
+  }, [userLocation, items, onDistanceChange]);
 
   // Wait until location is available
   if (!userLocation) {
@@ -87,8 +106,15 @@ function Map({ items, selectedItem, onItemSelect }) {
 
   return (
     <MapContainer
-      center={userLocation}
-      zoom={13}
+      center={
+        mapMode === "single" && items.length > 0
+          ? [
+              Number(items[0].latitude),
+              Number(items[0].longitude),
+            ]
+          : userLocation
+      }
+      zoom={mapMode === "single" ? 15 : 13}
       scrollWheelZoom={true}
       className="map"
     >
@@ -99,7 +125,11 @@ function Map({ items, selectedItem, onItemSelect }) {
 
       {/* Property markers */}
       {items.map((item) => (
-        <Pin item={item} key={item.id} onClick={onItemSelect} />
+        <Pin
+          item={item}
+          key={item.id}
+          onClick={onItemSelect}
+        />
       ))}
 
       {/* Route from user to selected property */}
@@ -107,7 +137,10 @@ function Map({ items, selectedItem, onItemSelect }) {
         <RoutingMachine
           position="topright"
           start={userLocation}
-          end={[Number(selectedItem.latitude), Number(selectedItem.longitude)]}
+          end={[
+            Number(selectedItem.latitude),
+            Number(selectedItem.longitude),
+          ]}
         />
       )}
     </MapContainer>
